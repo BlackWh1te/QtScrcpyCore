@@ -15,7 +15,7 @@
 #include "inputconvertgame.h"
 
 #define CURSOR_POS_CHECK 50
-#define MOUSE_FLUSH_INTERVAL_MS 8
+#define MOUSE_FLUSH_INTERVAL_MS 4
 #define MOUSE_IDLE_RELEASE_MS 300
 
 InputConvertGame::InputConvertGame(Controller *controller) : InputConvertNormal(controller) {
@@ -23,7 +23,7 @@ InputConvertGame::InputConvertGame(Controller *controller) : InputConvertNormal(
     m_ctrlSteerWheel.delayData.timer->setSingleShot(true);
     connect(m_ctrlSteerWheel.delayData.timer, &QTimer::timeout, this, &InputConvertGame::onSteerWheelTimer);
 
-    // Oxide fork: send accumulated mouse-look movement at a steady 125 Hz instead of one
+    // Oxide fork: send accumulated mouse-look movement at a steady 250 Hz instead of one
     // touch-move per OS mouse event (1000 Hz mice flooded the control socket -> stalls and jumps).
     m_ctrlMouseMove.flushTimer = new QTimer(this);
     m_ctrlMouseMove.flushTimer->setTimerType(Qt::PreciseTimer);
