@@ -47,8 +47,12 @@ void InputConvertGame::mouseEvent(const QMouseEvent *from, const QSize &frameSiz
         if (from->type() != QEvent::MouseButtonPress) {
             return;
         }
-        if (!switchGameMap()) {
-            m_needBackMouseMove = false;
+        updateSize(frameSize, showSize);
+        if (!m_gameMap) {
+            switchGameMap();
+            setMenuMode(false);
+        } else {
+            setMenuMode(!m_needBackMouseMove);
         }
         return;
     }
@@ -85,8 +89,12 @@ void InputConvertGame::keyEvent(const QKeyEvent *from, const QSize &frameSize, c
         if (QEvent::KeyPress != from->type()) {
             return;
         }
-        if (!switchGameMap()) {
-            m_needBackMouseMove = false;
+        updateSize(frameSize, showSize);
+        if (!m_gameMap) {
+            switchGameMap();
+            setMenuMode(false);
+        } else {
+            setMenuMode(!m_needBackMouseMove);
         }
         return;
     }
@@ -462,14 +470,7 @@ void InputConvertGame::retargetSteerWheel()
 void InputConvertGame::processKeyClick(const QPointF &clickPos, bool clickTwice, bool switchMap, const QKeyEvent *from)
 {
     if (switchMap && QEvent::KeyRelease == from->type()) {
-        m_needBackMouseMove = !m_needBackMouseMove;
-        hideMouseCursor(!m_needBackMouseMove);
-        if (m_needBackMouseMove) {
-            m_ctrlMouseMove.flushTimer->stop();
-            m_ctrlMouseMove.pendingDelta = QPointF(0.0, 0.0);
-            mouseMoveStopTouch();
-        }
-        m_ctrlMouseMove.lastPos = QPointF(0.0, 0.0);
+        setMenuMode(!m_needBackMouseMove);
     }
 
     if (QEvent::KeyPress == from->type()) {
@@ -817,6 +818,18 @@ void InputConvertGame::stopMouseMoveTimer()
     }
 }
 
+void InputConvertGame::setMenuMode(bool on)
+{
+    m_needBackMouseMove = on;
+    hideMouseCursor(m_gameMap && !on);
+    if (on) {
+        m_ctrlMouseMove.flushTimer->stop();
+        m_ctrlMouseMove.pendingDelta = QPointF(0.0, 0.0);
+        mouseMoveStopTouch();
+    }
+    m_ctrlMouseMove.lastPos = QPointF(0.0, 0.0);
+}
+
 bool InputConvertGame::switchGameMap()
 {
     m_gameMap = !m_gameMap;
@@ -844,6 +857,11 @@ bool InputConvertGame::switchGameMap()
 
 void InputConvertGame::hideMouseCursor(bool hide)
 {
+    // keep the override-cursor stack balanced no matter how often this is called
+    if (hide == m_cursorHidden) {
+        return;
+    }
+    m_cursorHidden = hide;
     if (hide) {
 #ifdef QT_NO_DEBUG
         QGuiApplication::setOverrideCursor(QCursor(Qt::BlankCursor));

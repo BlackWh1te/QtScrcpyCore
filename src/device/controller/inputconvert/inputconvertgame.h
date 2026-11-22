@@ -66,6 +66,8 @@ protected:
     QPointF mouseMoveAnchor();
 
     bool switchGameMap();
+    // Oxide fork: show/hide the cursor for menus while the keymap stays active
+    void setMenuMode(bool on);
     bool checkCursorPos(const QMouseEvent *from);
     void hideMouseCursor(bool hide);
 
@@ -132,6 +134,7 @@ private:
     } m_ctrlMouseMove;
     // enter custom (game) mode automatically on the first mouse event after a keymap with mouseMoveMap is loaded
     bool m_autoGameMapPending = false;
+    bool m_cursorHidden = false;
     // Oxide fork: optional sprint key ("sprintKey") and how much further up the stick goes ("sprintUpScale")
     int m_sprintKey = 0;
     double m_sprintUpScale = 2.0;
