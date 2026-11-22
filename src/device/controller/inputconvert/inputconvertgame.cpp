@@ -4,6 +4,9 @@
 #include <QTimer>
 #include <QTime>
 #include <QRandomGenerator>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QMetaEnum>
 
 #ifdef Q_OS_MACOS
 #include <CoreGraphics/CoreGraphics.h>
@@ -103,6 +106,12 @@ void InputConvertGame::keyEvent(const QKeyEvent *from, const QSize &frameSize, c
             return;
         }
 
+        if (m_sprintKey != 0 && from->key() == m_sprintKey) {
+            m_ctrlSteerWheel.sprint = (QEvent::KeyPress == from->type());
+            retargetSteerWheel();
+            return;
+        }
+
         // small eyes
         if (m_keyMap.isValidMouseMoveMap() && from->key() == m_keyMap.getMouseMoveMap().data.mouseMove.smallEyes.key) {
             m_ctrlMouseMove.smallEyes = (QEvent::KeyPress == from->type());
@@ -164,6 +173,24 @@ void InputConvertGame::loadKeyMap(const QString &json)
 {
     m_keyMap.loadKeyMap(json);
     m_autoGameMapPending = m_keyMap.isValidMouseMoveMap();
+
+    m_sprintKey = 0;
+    m_sprintUpScale = 2.0;
+    const QJsonObject root = QJsonDocument::fromJson(json.toUtf8()).object();
+    const QString sprintKey = root.value("sprintKey").toString();
+    if (!sprintKey.isEmpty()) {
+        bool ok = false;
+        const int value = QMetaEnum::fromType<Qt::Key>().keyToValue(sprintKey.toUtf8().constData(), &ok);
+        if (ok) {
+            m_sprintKey = value;
+        } else {
+            qWarning() << "unknown sprintKey" << sprintKey;
+        }
+    }
+    if (root.contains("sprintUpScale")) {
+        m_sprintUpScale = qBound(1.0, root.value("sprintUpScale").toDouble(2.0), 5.0);
+    }
+    m_ctrlSteerWheel.sprint = false;
 }
 
 void InputConvertGame::updateSize(const QSize &frameSize, const QSize &showSize)
@@ -348,25 +375,13 @@ void InputConvertGame::processSteerWheel(const KeyMap::KeyMapNode &node, const Q
         m_ctrlSteerWheel.pressedLeft = flag;
     }
 
+    m_ctrlSteerWheel.node = node;
+    m_ctrlSteerWheel.hasNode = true;
+
     // calc offset and pressed number
-    QPointF offset(0.0, 0.0);
-    int pressedNum = 0;
-    if (m_ctrlSteerWheel.pressedUp) {
-        ++pressedNum;
-        offset.ry() -= node.data.steerWheel.up.extendOffset;
-    }
-    if (m_ctrlSteerWheel.pressedRight) {
-        ++pressedNum;
-        offset.rx() += node.data.steerWheel.right.extendOffset;
-    }
-    if (m_ctrlSteerWheel.pressedDown) {
-        ++pressedNum;
-        offset.ry() += node.data.steerWheel.down.extendOffset;
-    }
-    if (m_ctrlSteerWheel.pressedLeft) {
-        ++pressedNum;
-        offset.rx() -= node.data.steerWheel.left.extendOffset;
-    }
+    const QPointF offset = calcSteerWheelOffset(node);
+    const int pressedNum = (m_ctrlSteerWheel.pressedUp ? 1 : 0) + (m_ctrlSteerWheel.pressedRight ? 1 : 0)
+                         + (m_ctrlSteerWheel.pressedDown ? 1 : 0) + (m_ctrlSteerWheel.pressedLeft ? 1 : 0);
     m_ctrlSteerWheel.delayData.pressedNum = pressedNum;
 
     // last key release and timer no active, active timer to detouch
@@ -405,6 +420,41 @@ void InputConvertGame::processSteerWheel(const KeyMap::KeyMapNode &node, const Q
     }
     m_ctrlSteerWheel.delayData.timer->start();
     return;
+}
+
+QPointF InputConvertGame::calcSteerWheelOffset(const KeyMap::KeyMapNode &node)
+{
+    QPointF offset(0.0, 0.0);
+    if (m_ctrlSteerWheel.pressedUp) {
+        const double scale = m_ctrlSteerWheel.sprint ? m_sprintUpScale : 1.0;
+        offset.ry() -= node.data.steerWheel.up.extendOffset * scale;
+    }
+    if (m_ctrlSteerWheel.pressedRight) {
+        offset.rx() += node.data.steerWheel.right.extendOffset;
+    }
+    if (m_ctrlSteerWheel.pressedDown) {
+        offset.ry() += node.data.steerWheel.down.extendOffset;
+    }
+    if (m_ctrlSteerWheel.pressedLeft) {
+        offset.rx() -= node.data.steerWheel.left.extendOffset;
+    }
+    return offset;
+}
+
+void InputConvertGame::retargetSteerWheel()
+{
+    if (!m_ctrlSteerWheel.hasNode || m_ctrlSteerWheel.delayData.pressedNum == 0) {
+        return;
+    }
+    const KeyMap::KeyMapNode &node = m_ctrlSteerWheel.node;
+    m_ctrlSteerWheel.delayData.timer->stop();
+    m_ctrlSteerWheel.delayData.queueTimer.clear();
+    m_ctrlSteerWheel.delayData.queuePos.clear();
+    getDelayQueue(m_ctrlSteerWheel.delayData.currentPos, node.data.steerWheel.centerPos + calcSteerWheelOffset(node),
+                  0.01f, 0.002f, 2, 8,
+                  m_ctrlSteerWheel.delayData.queuePos,
+                  m_ctrlSteerWheel.delayData.queueTimer);
+    m_ctrlSteerWheel.delayData.timer->start();
 }
 
 // -------- key event --------

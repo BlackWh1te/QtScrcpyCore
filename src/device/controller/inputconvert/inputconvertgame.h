@@ -40,6 +40,8 @@ protected:
 
     // steer wheel
     void processSteerWheel(const KeyMap::KeyMapNode &node, const QKeyEvent *from);
+    QPointF calcSteerWheelOffset(const KeyMap::KeyMapNode &node);
+    void retargetSteerWheel();
 
     // click
     void processKeyClick(const QPointF &clickPos, bool clickTwice, bool switchMap, const QKeyEvent *from);
@@ -95,6 +97,10 @@ private:
     {
         // the first key pressed
         int touchKey = Qt::Key_unknown;
+        // Oxide fork: sprint pushes the stick further up while held
+        bool sprint = false;
+        bool hasNode = false;
+        KeyMap::KeyMapNode node;
         bool pressedUp = false;
         bool pressedDown = false;
         bool pressedLeft = false;
@@ -126,6 +132,9 @@ private:
     } m_ctrlMouseMove;
     // enter custom (game) mode automatically on the first mouse event after a keymap with mouseMoveMap is loaded
     bool m_autoGameMapPending = false;
+    // Oxide fork: optional sprint key ("sprintKey") and how much further up the stick goes ("sprintUpScale")
+    int m_sprintKey = 0;
+    double m_sprintUpScale = 2.0;
 
     // for drag delay
     struct {
