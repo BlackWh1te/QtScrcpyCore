@@ -34,6 +34,9 @@ bool Decoder::open()
         qCritical("Could not allocate decoder context");
         return false;
     }
+    // Oxide fork: scrcpy streams have no B-frames, so output every frame as soon as it is decoded
+    m_codecCtx->flags |= AV_CODEC_FLAG_LOW_DELAY;
+    m_codecCtx->flags2 |= AV_CODEC_FLAG2_FAST;
     if (avcodec_open2(m_codecCtx, codec, NULL) < 0) {
         qCritical("Could not open H.264 codec");
         return false;

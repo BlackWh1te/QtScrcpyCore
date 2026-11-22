@@ -3,6 +3,7 @@
 
 #include <QPointF>
 #include <QQueue>
+#include <QTimer>
 
 #include "inputconvertnormal.h"
 #include "keymap.h"
@@ -60,6 +61,7 @@ protected:
     void mouseMoveStopTouch();
     void startMouseMoveTimer();
     void stopMouseMoveTimer();
+    QPointF mouseMoveAnchor();
 
     bool switchGameMap();
     bool checkCursorPos(const QMouseEvent *from);
@@ -76,6 +78,7 @@ protected:
 private slots:
     void onSteerWheelTimer();
     void onDragTimer();
+    void onMouseMoveFlush();
 
 private:
     QSize m_frameSize;
@@ -116,7 +119,13 @@ private:
         int timer = 0;
         bool smallEyes = false;
         int ignoreCount = 0;
+        // Oxide fork: mouse deltas are accumulated and flushed to the device at a fixed rate
+        QPointF pendingDelta = { 0.0, 0.0 };
+        QTimer *flushTimer = nullptr;
+        int idleMs = 0;
     } m_ctrlMouseMove;
+    // enter custom (game) mode automatically on the first mouse event after a keymap with mouseMoveMap is loaded
+    bool m_autoGameMapPending = false;
 
     // for drag delay
     struct {
