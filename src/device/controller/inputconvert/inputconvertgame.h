@@ -37,6 +37,8 @@ protected:
     int attachTouchID(int key);
     void detachTouchID(int key);
     int getTouchID(int key);
+    // Oxide fork: lift every finger and reset stick/look state (focus loss or exhausted touch ids)
+    void releaseAllTouches();
 
     // steer wheel
     void processSteerWheel(const KeyMap::KeyMapNode &node, const QKeyEvent *from);
@@ -90,6 +92,7 @@ private:
     bool m_gameMap = false;
     bool m_needBackMouseMove = false;
     int m_multiTouchID[MULTI_TOUCH_MAX_NUM] = { 0 };
+    QPointF m_touchPos[MULTI_TOUCH_MAX_NUM];
     KeyMap m_keyMap;
 
     bool m_processMouseMove = true;

@@ -29,6 +29,14 @@ InputConvertGame::InputConvertGame(Controller *controller) : InputConvertNormal(
     m_ctrlMouseMove.flushTimer->setTimerType(Qt::PreciseTimer);
     m_ctrlMouseMove.flushTimer->setInterval(MOUSE_FLUSH_INTERVAL_MS);
     connect(m_ctrlMouseMove.flushTimer, &QTimer::timeout, this, &InputConvertGame::onMouseMoveFlush);
+
+    // key releases never arrive while another window has focus: lift everything when we lose it
+    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
+        if (state != Qt::ApplicationActive) {
+            qWarning() << "[oxide] window inactive, releasing every finger";
+            releaseAllTouches();
+        }
+    });
 }
 
 InputConvertGame::~InputConvertGame() {}
@@ -248,6 +256,7 @@ void InputConvertGame::sendTouchEvent(int id, QPointF pos, AndroidMotioneventAct
         return;
     }
 
+    m_touchPos[id] = pos;
     QPoint absolutePos = calcFrameAbsolutePos(pos).toPoint();
     static QPoint lastAbsolutePos = absolutePos;
     if (AMOTION_EVENT_ACTION_MOVE == action && lastAbsolutePos == absolutePos) {
@@ -294,13 +303,45 @@ QPointF InputConvertGame::calcScreenAbsolutePos(QPointF relativePos)
 
 int InputConvertGame::attachTouchID(int key)
 {
-    for (int i = 0; i < MULTI_TOUCH_MAX_NUM; i++) {
-        if (0 == m_multiTouchID[i]) {
-            m_multiTouchID[i] = key;
-            return i;
+    // a key whose release was lost (e.g. Alt+Tab while held) keeps its finger instead of leaking a new one
+    const int existing = getTouchID(key);
+    if (existing >= 0) {
+        return existing;
+    }
+    for (int round = 0; round < 2; ++round) {
+        for (int i = 0; i < MULTI_TOUCH_MAX_NUM; i++) {
+            if (0 == m_multiTouchID[i]) {
+                m_multiTouchID[i] = key;
+                return i;
+            }
         }
+        qWarning() << "[oxide] all touch ids busy, releasing every finger";
+        releaseAllTouches();
     }
     return -1;
+}
+
+void InputConvertGame::releaseAllTouches()
+{
+    for (int i = 0; i < MULTI_TOUCH_MAX_NUM; i++) {
+        if (0 != m_multiTouchID[i]) {
+            sendTouchEvent(i, m_touchPos[i], AMOTION_EVENT_ACTION_UP);
+            m_multiTouchID[i] = 0;
+        }
+    }
+    m_ctrlSteerWheel.pressedUp = false;
+    m_ctrlSteerWheel.pressedDown = false;
+    m_ctrlSteerWheel.pressedLeft = false;
+    m_ctrlSteerWheel.pressedRight = false;
+    m_ctrlSteerWheel.sprint = false;
+    m_ctrlSteerWheel.delayData.timer->stop();
+    m_ctrlSteerWheel.delayData.queuePos.clear();
+    m_ctrlSteerWheel.delayData.queueTimer.clear();
+    m_ctrlSteerWheel.delayData.pressedNum = 0;
+    m_ctrlMouseMove.touching = false;
+    m_ctrlMouseMove.flushTimer->stop();
+    m_ctrlMouseMove.pendingDelta = QPointF(0.0, 0.0);
+    m_ctrlMouseMove.lastPos = QPointF(0.0, 0.0);
 }
 
 void InputConvertGame::detachTouchID(int key)
