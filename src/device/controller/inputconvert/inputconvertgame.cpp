@@ -84,6 +84,11 @@ void InputConvertGame::wheelEvent(const QWheelEvent *from, const QSize &frameSiz
 
 void InputConvertGame::keyEvent(const QKeyEvent *from, const QSize &frameSize, const QSize &showSize)
 {
+    if (from && !from->isAutoRepeat()) {
+        qWarning() << "[oxide] key" << QString::number(from->key(), 16) << (from->type() == QEvent::KeyPress ? "down" : "up")
+                   << "gameMap" << m_gameMap << "menu" << m_needBackMouseMove
+                   << "node" << m_keyMap.getKeyMapNodeKey(from->key()).type << "sprintKey" << QString::number(m_sprintKey, 16);
+    }
     // 处理开关按键
     if (m_keyMap.isSwitchOnKeyboard() && m_keyMap.getSwitchKey() == from->key()) {
         if (QEvent::KeyPress != from->type()) {
@@ -181,6 +186,7 @@ void InputConvertGame::loadKeyMap(const QString &json)
 {
     m_keyMap.loadKeyMap(json);
     m_autoGameMapPending = m_keyMap.isValidMouseMoveMap();
+    qWarning() << "[oxide] keymap loaded, bytes" << json.size() << "mouseMoveMap" << m_keyMap.isValidMouseMoveMap();
 
     m_sprintKey = 0;
     m_sprintUpScale = 2.0;
@@ -833,7 +839,7 @@ void InputConvertGame::setMenuMode(bool on)
 bool InputConvertGame::switchGameMap()
 {
     m_gameMap = !m_gameMap;
-    qInfo() << QString("current keymap mode: %1").arg(m_gameMap ? "custom" : "normal");
+    qWarning() << QString("[oxide] keymap mode: %1").arg(m_gameMap ? "custom" : "normal");
 
     if (!m_keyMap.isValidMouseMoveMap()) {
         return m_gameMap;
